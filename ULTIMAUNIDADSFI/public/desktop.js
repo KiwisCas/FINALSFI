@@ -1,7 +1,7 @@
 let song, font, amplitude, fft;
 let socket;
 let waveOffset = 0;
-let control = { intensity: 1, colorR: 255, colorG: 0, colorB: 0, mode: "wave" };
+let control = { intensity: 1, colorR: 255, colorG: 0, colorB: 0, mode: "wave", touchX: undefined, touchY: undefined };
 
 // Variables para suavizar transiciones
 let smoothIntensity = 1;
@@ -66,8 +66,9 @@ function setup() {
   socket = io();
   socket.emit("role", "desktop");
   socket.on("toDesktop", (data) => {
-    control = data;
+    control = { ...control, ...data }; // Mezclar datos para mantener valores previos si no se envían
   });
+  
 
   // Iniciar automáticamente (reducir interacciones)
   userStartAudio().then(() => {
@@ -178,12 +179,33 @@ function draw() {
     }
   }
 
-  // Actualizar y dibujar partículas
+  // Actualizar y dibujar partículas con atracción magnética y fricción
   for (let i = particles.length - 1; i >= 0; i--) {
     let p = particles[i];
+    
+    // Aplicar atracción magnética si hay un toque activo
+    if (control.touchX !== undefined && control.touchY !== undefined) {
+      let targetX = control.touchX * width; // Convertir de normalizado a píxeles
+      let targetY = control.touchY * height;
+      let dx = targetX - p.x;
+      let dy = targetY - p.y;
+      let dist = sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        let force = 0.2; // Fuerza de atracción (ajusta para más/menos intensidad)
+        p.vx += (dx / dist) * force;
+        p.vy += (dy / dist) * force;
+      }
+    }
+    
+    // Aplicar fricción para que las partículas se desaceleren
+    p.vx *= 0.98;
+    p.vy *= 0.98;
+    
+    // Actualizar posición
     p.x += p.vx;
     p.y += p.vy;
     p.life--;
+    
     if (p.life <= 0) {
       particles.splice(i, 1); // Eliminar partículas muertas
     } else {
